@@ -1,0 +1,27 @@
+{
+  "classes": [
+    "Apple",
+    "Banana",
+    "Carambola",
+    "Kiwi",
+    "Mango",
+    "Musk Melon",
+    "Orange",
+    "Peach",
+    "Pitaya",
+    "Plum",
+    "Tomatoes"
+  ],
+  "n_samples": 66000,
+  "feature_dim": 123,
+  "max_per_class": 2000,
+  "roi_mode": "yolo",
+  "yolo_weights": "yolov8n.pt",
+  "aug_per_image": 2,
+  "train_accuracy": 0.9991818181818182,
+  "train_f1_macro": 0.9991816747172595,
+  "train_f1_weighted": 0.9991816747172594,
+  "val_accuracy": 0.9736363636363636,
+  "val_f1_macro": 0.9736306098487545,
+  "val_f1_weighted": 0.9736306098487544
+}

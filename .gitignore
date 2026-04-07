@@ -1,0 +1,55 @@
+# --- Dataset: không đẩy lên GitHub ---
+data/
+
+# --- Traffic / dataset lớn ngoài project (nếu copy vào repo) ---
+Traffic/
+
+# --- Model weights (file lớn); giữ file JSON meta nhỏ ---
+weights/*.keras
+weights/*.h5
+weights/*.pt
+weights/*.pth
+weights/*.joblib
+weights/*.onnx
+weights/*.safetensors
+
+# YOLO / PyTorch weights (.pt) — thường rất lớn
+*.pt
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+.env
+.env.*
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Tools
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini

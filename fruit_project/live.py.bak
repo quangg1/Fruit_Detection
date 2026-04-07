@@ -1,0 +1,60 @@
+"""
+Nhận dạng trái cây từ webcam / điện thoại (IP Webcam).
+Chạy: python -m fruit_project.live
+Hoặc: set FRUIT_CAMERA=http://IP:8080/video && python -m fruit_project.live
+"""
+
+from __future__ import annotations
+
+import sys
+
+import cv2
+import joblib
+import numpy as np
+
+from fruit_project.config import MODEL_PATH, parse_camera_source
+from fruit_project.features import extract_features
+
+
+def load_classifier():
+    if not MODEL_PATH.is_file():
+        print("Chua co model. Hay chay: python -m fruit_project.train", file=sys.stderr)
+        sys.exit(1)
+    pack = joblib.load(MODEL_PATH)
+    return pack["model"], pack["label_encoder"]
+
+
+def main() -> None:
+    clf, le = load_classifier()
+    src = parse_camera_source()
+    cap = cv2.VideoCapture(src)
+    if not cap.isOpened():
+        print(f"Khong mo duoc camera: {src}", file=sys.stderr)
+        print("Kiem tra FRUIT_CAMERA hoac URL IP Webcam.", file=sys.stderr)
+        sys.exit(1)
+
+    print("q = thoat. Lay trai o giua khung.")
+    while True:
+        ok, frame = cap.read()
+        if not ok:
+            break
+        feat = extract_features(frame)
+        proba = clf.predict_proba(feat.reshape(1, -1))[0]
+        pred_idx = int(np.argmax(proba))
+        label = le.inverse_transform([pred_idx])[0]
+        conf = float(proba[pred_idx])
+
+        h, w = frame.shape[:2]
+        cv2.rectangle(frame, (0, 0), (w, 40), (40, 40, 40), -1)
+        text = f"{label}  ({conf*100:.1f}%)"
+        cv2.putText(frame, text, (10, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+        cv2.imshow("Fruit classification (DIP)", frame)
+        if cv2.waitKey(1) & 0xFF == ord("q"):
+            break
+
+    cap.release()
+    cv2.destroyAllWindows()
+
+
+if __name__ == "__main__":
+    main()
