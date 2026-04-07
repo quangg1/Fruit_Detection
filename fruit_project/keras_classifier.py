@@ -40,54 +40,48 @@ def _find_labels_json(model_dir: Path) -> Path | None:
     return candidates[0]
 
 
-def load_keras_pack(
-    model_dir: Path,
-    *,
+def _classes_from_labels_file(labels_path: Path, fallback_classes: list[str]) -> list[str]:
+    raw = json.loads(labels_path.read_text(encoding="utf-8"))
+    if isinstance(raw, dict):
+        pairs: list[tuple[int, str]] = []
+        for k, v in raw.items():
+            try:
+                pairs.append((int(k), str(v)))
+            except Exception:
+                continue
+        pairs.sort(key=lambda t: t[0])
+        return [name for _, name in pairs]
+    if isinstance(raw, list):
+        return [str(x) for x in raw]
+    return list(fallback_classes)
+
+
+def load_keras_pack_from_path(
+    model_path: Path,
     fallback_classes: list[str],
+    labels_path: Path | None = None,
 ) -> dict[str, Any] | None:
-    """Load latest `.keras` + a label map if available."""
-    model_path = _find_latest_keras_model(model_dir)
-    if model_path is None:
+    """Load one `.keras` file; optional `labels.json` path. Dùng cho upload / deploy."""
+    if not model_path.is_file():
         return None
 
-    labels_path = _find_labels_json(model_dir)
-    classes: list[str]
-    if labels_path is not None:
-        raw = json.loads(labels_path.read_text(encoding="utf-8"))
-        # notebook saved: {int(i): name for i, name in enumerate(le.classes_)}
-        # JSON keys become strings.
-        if isinstance(raw, dict):
-            # sort by numeric key
-            pairs: list[tuple[int, str]] = []
-            for k, v in raw.items():
-                try:
-                    pairs.append((int(k), str(v)))
-                except Exception:
-                    continue
-            pairs.sort(key=lambda t: t[0])
-            classes = [name for _, name in pairs]
-        elif isinstance(raw, list):
-            classes = [str(x) for x in raw]
-        else:
-            classes = list(fallback_classes)
+    if labels_path is not None and labels_path.is_file():
+        classes = _classes_from_labels_file(labels_path, fallback_classes)
     else:
         classes = list(fallback_classes)
 
-    # Lazy TF import
     import tensorflow as tf  # type: ignore
 
     model = tf.keras.models.load_model(str(model_path))
     model.trainable = False
     image_size = None
     if getattr(model, "input_shape", None) is not None:
-        # (None, H, W, 3)
         sh = model.input_shape
         if len(sh) == 4:
             image_size = int(sh[1])
     if image_size is None:
         image_size = 128
 
-    # Align label list with softmax size (e.g. Kaggle 12-class model vs local 11-class SVM meta).
     try:
         out_dim = int(model.output_shape[-1])
     except Exception:
@@ -103,6 +97,50 @@ def load_keras_pack(
             classes = classes[:out_dim]
 
     return {"type": "keras", "model": model, "classes": classes, "image_size": image_size, "model_path": str(model_path)}
+
+
+def load_keras_pack(
+    model_dir: Path,
+    *,
+    fallback_classes: list[str],
+) -> dict[str, Any] | None:
+    """Load latest `.keras` trong thư mục + label map nếu có."""
+    model_path = _find_latest_keras_model(model_dir)
+    if model_path is None:
+        return None
+    labels_path = _find_labels_json(model_dir)
+    return load_keras_pack_from_path(model_path, fallback_classes, labels_path)
+
+
+def load_keras_pack_from_bytes(
+    model_bytes: bytes,
+    fallback_classes: list[str],
+    labels_json_bytes: bytes | None = None,
+) -> dict[str, Any] | None:
+    """Load từ bytes (Streamlit upload): ghi file tạm rồi load_model."""
+    import os
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(suffix=".keras", delete=False) as f:
+        f.write(model_bytes)
+        mp = f.name
+    lp: str | None = None
+    if labels_json_bytes:
+        with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as f:
+            f.write(labels_json_bytes)
+            lp = f.name
+    try:
+        return load_keras_pack_from_path(Path(mp), fallback_classes, Path(lp) if lp else None)
+    finally:
+        try:
+            os.unlink(mp)
+        except OSError:
+            pass
+        if lp:
+            try:
+                os.unlink(lp)
+            except OSError:
+                pass
 
 
 def predict_roi_keras(roi_bgr: np.ndarray, pack: dict[str, Any]) -> tuple[str, float, np.ndarray]:
